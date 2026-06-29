@@ -1,0 +1,127 @@
+#define OLC_PGE_APPLICATION
+#include "olcPixelGameEngine.h"
+#include <vector>
+#include <cmath>
+
+using namespace std;
+
+struct vec4d { float x, y, z, w; };
+struct vec3d { float x, y, z; };
+struct edge { int a, b; };
+
+class TesseractEngine : public olc::PixelGameEngine {
+public:
+    vector<vec4d> points4D;
+    vector<edge> edges;
+    float totalTime = 0.0f;
+
+    TesseractEngine() {
+        sAppName = "TESERACTO - Rotación tipo MATLAB";
+    }
+
+public:
+    bool OnUserCreate() override {
+
+
+        for (int i = 0; i < 16; i++) {
+            points4D.push_back({
+                (float)((i & 1) ? 1 : -1),
+                (float)((i & 2) ? 1 : -1),
+                (float)((i & 4) ? 1 : -1),
+                (float)((i & 8) ? 1 : -1)
+                });
+        }
+
+
+        for (int i = 0; i < 16; i++)
+            for (int bit = 0; bit < 4; bit++) {
+                int j = i ^ (1 << bit);
+                if (i < j) edges.push_back({ i, j });
+            }
+
+        return true;
+    }
+
+
+
+    vec4d RotXY(const vec4d& p, float t) {
+        float c = cos(t), s = sin(t);
+        return { p.x * c - p.y * s, p.x * s + p.y * c, p.z, p.w };
+    }
+
+    vec4d RotXZ(const vec4d& p, float t) {
+        float c = cos(t), s = sin(t);
+        return { p.x * c - p.z * s, p.y, p.x * s + p.z * c, p.w };
+    }
+
+    vec4d RotXW(const vec4d& p, float t) {
+        float c = cos(t), s = sin(t);
+        return { p.x * c - p.w * s, p.y, p.z, p.x * s + p.w * c };
+    }
+
+    vec4d RotYZ(const vec4d& p, float t) {
+        float c = cos(t), s = sin(t);
+        return { p.x, p.y * c - p.z * s, p.y * s + p.z * c, p.w };
+    }
+
+    vec4d RotYW(const vec4d& p, float t) {
+        float c = cos(t), s = sin(t);
+        return { p.x, p.y * c - p.w * s, p.z, p.y * s + p.w * c };
+    }
+
+    vec4d RotZW(const vec4d& p, float t) {
+        float c = cos(t), s = sin(t);
+        return { p.x, p.y, p.z * c - p.w * s, p.z * s + p.w * c };
+    }
+
+
+    vec4d RotateMATLAB(vec4d p, float t) {
+        p = RotXY(p, t * 0.7f);
+        p = RotZW(p, t * 0.9f);
+        p = RotXW(p, t * 0.5f);
+        p = RotYZ(p, t * 0.8f);
+        return p;
+    }
+
+    vec3d Project4Dto3D(vec4d p) {
+        float w = 4.0f - p.w;
+        return { p.x / w, p.y / w, p.z / w };
+    }
+
+    olc::vi2d Project3Dto2D(vec3d p) {
+        float s = 180.0f;
+        return {
+            int(ScreenWidth() / 2 + p.x * s),
+            int(ScreenHeight() / 2 + p.y * s)
+        };
+    }
+
+public:
+    bool OnUserUpdate(float fElapsedTime) override {
+        Clear(olc::BLACK);
+
+        totalTime += fElapsedTime;
+
+        vector<vec3d> proj(points4D.size());
+
+        for (int i = 0; i < points4D.size(); i++) {
+            vec4d r = RotateMATLAB(points4D[i], totalTime);
+            proj[i] = Project4Dto3D(r);
+        }
+
+        for (auto& e : edges) {
+            auto a = Project3Dto2D(proj[e.a]);
+            auto b = Project3Dto2D(proj[e.b]);
+            DrawLine(a, b, olc::CYAN);
+        }
+
+        return true;
+    }
+};
+
+int main() {
+    TesseractEngine demo;
+    if (demo.Construct(800, 600, 1, 1))
+        demo.Start();
+    return 0;
+}
